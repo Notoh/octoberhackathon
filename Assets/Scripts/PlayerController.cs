@@ -2,29 +2,37 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography;
 using Packages.Rider.Editor;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 public class PlayerController : MonoBehaviour {
     private Control[] last;
     private Control[] current;
+    private Transform sword;
+    [FormerlySerializedAs("points")] public Transform[] attackPoints;
+    public Transform[] blockPoints;
 
-    private Action lastAction { get; set; } = new Action(-1, -1, Action.ActionType.Reset);
-    private Action action { get; set; } = new Action(-1, -1, Action.ActionType.Reset);
+    private Action lastAction { get; set; } = new Action(0, 0, Action.ActionType.Reset);
+    public static Action action { get; set; } = new Action(0, 0, Action.ActionType.Reset);
+    private Action copyBuffer;
     private bool firstRun;
     private bool blockSwing;
-
+    private float trip;
+    
     // Start is called before the first frame update
     void Start() {
         firstRun = true;
         blockSwing = true;
+        sword = transform.GetChild(0);
+        trip = 0;
     }
 
     // Update is called once per frame
     void Update() {
         FindAction();
+        SwingSword();
     }
 
     private void FindAction() {
@@ -37,6 +45,16 @@ public class PlayerController : MonoBehaviour {
             return;
         }
         firstRun = false;
+        if (current.Contains(Control.Copy)) {
+            copyBuffer = action;
+            return;
+        }
+
+        if (current.Contains(Control.Paste)) {
+            action = copyBuffer;
+            trip = 0;
+            return;
+        }
         Action.ActionType type;
         if (current.Contains(Control.Insert)) {
             type = Action.ActionType.Reset;
@@ -74,6 +92,12 @@ public class PlayerController : MonoBehaviour {
             case Action.ActionType.Swing: {
                 start = lastAction.endPosition;
                 end = (int) current[0];
+                //legal swing combinations
+                if (Math.Abs(end - start) == 1 || Math.Abs(end - start) == 3) {
+                    break;
+                }
+
+                type = Action.ActionType.Trip;
                 break;
             }
             case Action.ActionType.Block: {
@@ -111,6 +135,10 @@ public class PlayerController : MonoBehaviour {
                 type = Action.ActionType.Trip;
                 break;
             }
+            case Action.ActionType.Reset:
+                start = 0;
+                end = 0;
+                break;
             default: {
                 //if you reset or tripped, irrelevant
                 start = -1;
@@ -123,12 +151,80 @@ public class PlayerController : MonoBehaviour {
         action = new Action(start, end, type);
     }
 
+    private void SwingSword() {
+        if (trip > 0) {
+            trip = Math.Max(0, trip - Time.deltaTime);
+            return;
+        }
+        switch (action.actionType) {
+            case Action.ActionType.Reset:
+            case Action.ActionType.Swing:
+            case Action.ActionType.Jab:
+                sword.position = attackPoints[action.endPosition].position;
+                sword.rotation = attackPoints[action.endPosition].rotation;
+                //todo animate
+                break;
+            case Action.ActionType.Block:
+                switch (action.startPosition) {
+                    case 1:
+                        switch (action.endPosition) {
+                            case 3:
+                                sword.position = blockPoints[0].position;
+                                sword.rotation = blockPoints[0].rotation;
+                                break;
+                            case 7:
+                                sword.position = blockPoints[1].position;
+                                sword.rotation = blockPoints[1].rotation;
+                                break;
+                            case 9:
+                                sword.position = blockPoints[2].position;
+                                sword.rotation = blockPoints[2].rotation;
+                                break;
+                        }
+
+                        break;
+                    case 2:
+                        sword.position = blockPoints[3].position;
+                        sword.rotation = blockPoints[3].rotation;
+                        break;
+                    case 3:
+                        switch (action.endPosition) {
+                            case 7:
+                                sword.position = blockPoints[4].position;
+                                sword.rotation = blockPoints[4].rotation;
+                                break;
+                            case 9:
+                                sword.position = blockPoints[5].position;
+                                sword.rotation = blockPoints[5].rotation;
+                                break;
+                        }
+
+                        break;
+                    case 4:
+                        sword.position = blockPoints[6].position;
+                        sword.rotation = blockPoints[6].rotation;
+                        break;
+                    case 7:
+                        sword.position = blockPoints[7].position;
+                        sword.rotation = blockPoints[7].rotation;
+                        break;
+                }
+                break;
+            case Action.ActionType.Trip:
+                //TODO add a stumble animation
+                trip = 0.5f;
+                sword.position = attackPoints[0].position;
+                sword.rotation = attackPoints[0].rotation;
+                break;
+        }
+    }
+    
     void OnGUI() {
         GUI.Label(new Rect(0,0,100,100), action.startPosition + " " + action.endPosition + " " + action.actionType);
     }
 
     private enum Control {
-        Insert, LowLeft, LowMid, LowRight, MidLeft, MidCenter, MidRight, TopLeft, TopMid, TopRight //use enum ordinals to represent numpad key
+        Insert, LowLeft, LowMid, LowRight, MidLeft, MidCenter, MidRight, TopLeft, TopMid, TopRight, Copy, Paste //use enum ordinals to represent numpad key
         //TODO hack abilities
     }
 
@@ -165,6 +261,14 @@ public class PlayerController : MonoBehaviour {
         }
         if (Input.GetKey(KeyCode.Keypad9)) {
             controls.Add(Control.TopRight);
+        }
+
+        if (Input.GetKey(KeyCode.C)) {
+            controls.Add(Control.Copy);
+        }
+
+        if (Input.GetKeyDown(KeyCode.V)) {
+            controls.Add(Control.Paste);
         }
 
         return controls.ToArray();

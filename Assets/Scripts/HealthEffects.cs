@@ -5,14 +5,18 @@ using UnityEngine.UI;
 
 public class HealthEffects : MonoBehaviour
 {
-    public int Health;
+    public static int Health;
+    public static int enemyhealth;
     public ShaderEffect_BleedingColors distort;
     public Text HPText;
+    public Text EnemyText;
     // Start is called before the first frame update
     void Start()
     {
         Health = 100;
         HPText.text = "HP: " + Health.ToString ();
+        enemyhealth = 100;
+        EnemyText.text = "HP: " + Health.ToString();
     }
 
     // Update is called once per frame
@@ -30,5 +34,6 @@ public class HealthEffects : MonoBehaviour
         }
 
         HPText.text = "HP: " + Health.ToString();
+        EnemyText.text = "HP: " + enemyhealth.ToString();
     }
 }
