@@ -22,7 +22,7 @@ public class animationStateController : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        if (delay != 0)
+        if (delay > 0)
         {
             delay -= Time.deltaTime;
             return;
